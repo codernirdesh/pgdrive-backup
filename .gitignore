@@ -1,0 +1,7 @@
+# Build
+.env
+credentials.json
+token.json
+*.enc
+pgdrive-backup
+/bin/
