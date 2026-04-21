@@ -43,15 +43,16 @@ jobs:
           mkdir -p dist
           go build -ldflags="-s -w" -o "dist/backup${EXT}" ./cmd/backup
           go build -ldflags="-s -w" -o "dist/decrypt${EXT}" ./cmd/decrypt
+          go build -ldflags="-s -w" -o "dist/web${EXT}" ./cmd/web
 
       - name: Archive binaries
         run: |
           cd dist
           ARCHIVE="pgdrive-backup_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}"
           if [ "${{ matrix.goos }}" = "windows" ]; then
-            zip "${ARCHIVE}.zip" backup.exe decrypt.exe
+            zip "${ARCHIVE}.zip" backup.exe decrypt.exe web.exe
           else
-            tar czf "${ARCHIVE}.tar.gz" backup decrypt
+            tar czf "${ARCHIVE}.tar.gz" backup decrypt web
           fi
 
       - name: Upload release assets
