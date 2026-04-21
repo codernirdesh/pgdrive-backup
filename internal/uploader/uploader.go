@@ -21,6 +21,14 @@ type Client struct {
 	folderID string
 }
 
+// BackupFile describes a backup stored in Google Drive.
+type BackupFile struct {
+	ID          string
+	Name        string
+	CreatedTime time.Time
+	Size        int64
+}
+
 // New creates a Google Drive client using OAuth 2.0 credentials.
 // On first run it prints an authorization URL — visit it, grant access, and
 // paste the code back. The resulting token (with refresh token) is saved to
@@ -91,6 +99,70 @@ func saveToken(path string, tok *oauth2.Token) error {
 	}
 	defer f.Close()
 	return json.NewEncoder(f).Encode(tok)
+}
+
+// ListBackups returns backup-like files from the configured Drive folder.
+func (c *Client) ListBackups(ctx context.Context, prefix string) ([]BackupFile, error) {
+	query := fmt.Sprintf("'%s' in parents and trashed = false", c.folderID)
+	if prefix != "" {
+		query += fmt.Sprintf(" and name contains '%s'", prefix)
+	}
+
+	var backups []BackupFile
+	pageToken := ""
+	for {
+		req := c.srv.Files.List().
+			Context(ctx).
+			Q(query).
+			Fields("nextPageToken, files(id, name, createdTime, size)").
+			SupportsAllDrives(true).
+			IncludeItemsFromAllDrives(true).
+			PageSize(100)
+
+		if pageToken != "" {
+			req = req.PageToken(pageToken)
+		}
+
+		result, err := req.Do()
+		if err != nil {
+			return nil, fmt.Errorf("list backups: %w", err)
+		}
+
+		for _, f := range result.Files {
+			created, err := time.Parse(time.RFC3339, f.CreatedTime)
+			if err != nil {
+				log.Printf("skip %s: bad timestamp %q", f.Name, f.CreatedTime)
+				continue
+			}
+
+			backups = append(backups, BackupFile{
+				ID:          f.Id,
+				Name:        f.Name,
+				CreatedTime: created,
+				Size:        f.Size,
+			})
+		}
+
+		pageToken = result.NextPageToken
+		if pageToken == "" {
+			break
+		}
+	}
+
+	return backups, nil
+}
+
+// Download opens a streaming reader for a Drive file.
+func (c *Client) Download(ctx context.Context, fileID string) (io.ReadCloser, error) {
+	res, err := c.srv.Files.Get(fileID).
+		Context(ctx).
+		SupportsAllDrives(true).
+		Download()
+	if err != nil {
+		return nil, fmt.Errorf("download file %s: %w", fileID, err)
+	}
+
+	return res.Body, nil
 }
 
 // Upload streams data directly to Google Drive without buffering to disk.

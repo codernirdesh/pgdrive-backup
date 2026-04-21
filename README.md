@@ -21,6 +21,7 @@ All stages are connected via `io.Pipe()` — **zero temp files, constant memory*
 - **Max compression** — gzip level 9 (BestCompression)
 - **Automated retention** — deletes backups older than N days
 - **Decrypt utility** — included CLI to decrypt + decompress backups
+- **Backup browser** — list, sort, download, and decrypt Drive backups interactively
 - **Docker ready** — multi-stage Alpine image with `pg_dump` included
 
 ## Quick Start
@@ -96,21 +97,54 @@ Or with Docker:
 
 ## Restoring a Backup
 
-### 1. Download the `.sql.gz.enc` file from Google Drive
-
-### 2. Decrypt and decompress
+### Option A: Browse backups directly from Google Drive
 
 ```bash
-make decrypt KEY=<your-hex-key> INPUT=backup.sql.gz.enc OUTPUT=backup.sql
+./bin/decrypt
+```
+
+That opens an interactive picker which:
+
+- lists all backups in the configured Drive folder
+- sorts them newest first
+- lets you download the encrypted backup, decrypt it, or do both
+
+You can also just list them:
+
+```bash
+make list-backups
+# or
+./bin/decrypt -list
+```
+
+### Option B: Download one manually, then decrypt locally
+
+```bash
+make decrypt KEY=<your-hex-key> INPUT=backup.sql.gz.enc OUTPUT=backup.dump
 
 # Or directly:
-./bin/decrypt -key <hex-key> -input backup.sql.gz.enc -output backup.sql
+./bin/decrypt -key <hex-key> -input backup.sql.gz.enc -output backup.dump
 ```
+
+The decrypted output is a **pg_dump custom-format archive** suitable for `pg_restore`.
 
 ### 3. Restore to PostgreSQL
 
 ```bash
-pg_restore -h <host> -U <user> -d <database> backup.sql
+pg_restore -h <host> -U <user> -d <database> backup.dump
+```
+
+### Handy non-interactive examples
+
+```bash
+# decrypt the newest backup straight from Drive
+./bin/decrypt -latest -action decrypt -output ./restore.dump
+
+# download only the second newest encrypted backup
+./bin/decrypt -select 2 -action download -download ./downloads
+
+# save both the encrypted file and the decrypted restore archive
+./bin/decrypt -latest -action both -download ./downloads -output ./restore.dump
 ```
 
 ## Project Structure
@@ -139,6 +173,8 @@ pg_restore -h <host> -U <user> -d <database> backup.sql
 Files are named: `{prefix}_{database}_{UTC-timestamp}.sql.gz.enc`
 
 Example: `pgbackup_mydb_2026-04-19_020000.sql.gz.enc`
+
+> The `.sql.gz.enc` suffix is historical; after decrypting and decompressing, the payload is actually a `pg_dump --format=custom` archive, so restore it with `pg_restore`.
 
 ## Security Notes
 

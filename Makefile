@@ -1,4 +1,4 @@
-.PHONY: build run decrypt clean docker keygen
+.PHONY: build run decrypt browse list-backups clean docker keygen
 
 # Load .env if it exists
 ifneq (,$(wildcard .env))
@@ -19,6 +19,14 @@ run: build
 # Usage: make decrypt KEY=<hex-key> INPUT=<file.sql.gz.enc> OUTPUT=<file.sql>
 decrypt: build
 	./bin/decrypt -key $(KEY) -input $(INPUT) -output $(OUTPUT)
+
+# Browse Google Drive backups interactively
+browse: build
+	./bin/decrypt
+
+# List backups currently stored in Google Drive
+list-backups: build
+	./bin/decrypt -list
 
 # Build Docker image
 docker:
