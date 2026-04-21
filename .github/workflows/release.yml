@@ -1,9 +1,9 @@
 name: Release
 
 on:
-  push:
-    tags:
-      - "v*"
+  release:
+    types:
+      - created
 
 permissions:
   contents: write
@@ -27,6 +27,8 @@ jobs:
             goarch: amd64
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
 
       - uses: actions/setup-go@v5
         with:
@@ -48,7 +50,7 @@ jobs:
       - name: Archive binaries
         run: |
           cd dist
-          ARCHIVE="pgdrive-backup_${{ github.ref_name }}_${{ matrix.goos }}_${{ matrix.goarch }}"
+          ARCHIVE="pgdrive-backup_${{ github.event.release.tag_name }}_${{ matrix.goos }}_${{ matrix.goarch }}"
           if [ "${{ matrix.goos }}" = "windows" ]; then
             zip "${ARCHIVE}.zip" backup.exe decrypt.exe web.exe
           else
