@@ -22,6 +22,7 @@ All stages are connected via `io.Pipe()` — **zero temp files, constant memory*
 - **Automated retention** — deletes backups older than N days
 - **Decrypt utility** — included CLI to decrypt + decompress backups
 - **Backup browser** — list, sort, download, and decrypt Drive backups interactively
+- **Web restore UI** — serve backups in a browser with one-click download/decrypt actions
 - **Docker ready** — multi-stage Alpine image with `pg_dump` included
 
 ## Quick Start
@@ -82,6 +83,22 @@ make docker
 make docker-run
 ```
 
+### 3b. Serve the web UI
+
+**Local:**
+
+```bash
+make serve-web
+```
+
+Then open `http://localhost:8080`.
+
+**Docker:**
+
+```bash
+make docker-web
+```
+
 ### 4. Automate with Cron
 
 ```bash
@@ -116,6 +133,21 @@ make list-backups
 # or
 ./bin/decrypt -list
 ```
+
+### Option A2: Use the web UI
+
+```bash
+./bin/web
+```
+
+The web UI:
+
+- shows all Drive backups sorted newest first
+- lets you filter by filename in the browser
+- downloads the raw encrypted `.enc` backup with one click
+- downloads a decrypted `.dump` restore archive when `ENCRYPTION_KEY` is set
+
+> Web mode expects an existing Drive token file. If `token.json` is missing, authorize once with `./bin/decrypt -list` first.
 
 ### Option B: Download one manually, then decrypt locally
 
@@ -153,7 +185,8 @@ pg_restore -h <host> -U <user> -d <database> backup.dump
 .
 ├── cmd/
 │   ├── backup/       # Main backup CLI entry point
-│   └── decrypt/      # Decrypt + decompress utility
+│   ├── decrypt/      # Decrypt + decompress utility
+│   └── web/          # Browser-based restore UI
 ├── internal/
 │   ├── config/       # Environment-based configuration
 │   ├── dumper/       # pg_dump streaming wrapper

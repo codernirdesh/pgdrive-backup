@@ -1,4 +1,4 @@
-.PHONY: build run decrypt browse list-backups clean docker keygen
+.PHONY: build run decrypt browse list-backups serve-web clean docker docker-web keygen
 
 # Load .env if it exists
 ifneq (,$(wildcard .env))
@@ -10,6 +10,7 @@ endif
 build:
 	go build -o bin/backup  ./cmd/backup
 	go build -o bin/decrypt ./cmd/decrypt
+	go build -o bin/web     ./cmd/web
 
 # Run backup (loads .env automatically)
 run: build
@@ -28,9 +29,24 @@ browse: build
 list-backups: build
 	./bin/decrypt -list
 
+# Start the browser-based backup UI
+serve-web: build
+	./bin/web
+
 # Build Docker image
 docker:
 	docker build -t pgdrive-backup .
+
+# Run the web UI via Docker
+docker-web: docker
+	docker run --rm -p 8080:8080 --env-file .env \
+		-v $(PWD)/credentials.json:/app/credentials.json:ro \
+		-v $(PWD)/token.json:/app/token.json \
+		-e GOOGLE_DRIVE_CREDENTIALS=/app/credentials.json \
+		-e GOOGLE_DRIVE_TOKEN_FILE=/app/token.json \
+		-e WEB_ADDR=:8080 \
+		--entrypoint /usr/local/bin/web \
+		pgdrive-backup
 
 # Run via Docker
 docker-run:

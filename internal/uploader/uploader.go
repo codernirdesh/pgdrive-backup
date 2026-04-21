@@ -79,6 +79,57 @@ func authorizeInteractive(ctx context.Context, cfg *oauth2.Config) (*oauth2.Toke
 	return tok, nil
 }
 
+// OAuthConfig holds the parsed OAuth2 config from a credentials file.
+type OAuthConfig struct {
+	cfg *oauth2.Config
+}
+
+// LoadOAuthConfig reads the credentials file and returns the OAuth2 config.
+func LoadOAuthConfig(credentialsFile string) (*OAuthConfig, error) {
+	data, err := os.ReadFile(credentialsFile)
+	if err != nil {
+		return nil, fmt.Errorf("read credentials file: %w", err)
+	}
+	cfg, err := google.ConfigFromJSON(data, drive.DriveScope)
+	if err != nil {
+		return nil, fmt.Errorf("parse OAuth credentials: %w", err)
+	}
+	return &OAuthConfig{cfg: cfg}, nil
+}
+
+// AuthURL returns the URL the user must visit to authorize the app.
+func (o *OAuthConfig) AuthURL(state string) string {
+	return o.cfg.AuthCodeURL(state, oauth2.AccessTypeOffline, oauth2.ApprovalForce)
+}
+
+// Exchange swaps an authorization code for a token and saves it.
+func (o *OAuthConfig) Exchange(ctx context.Context, code, tokenFile string) error {
+	tok, err := o.cfg.Exchange(ctx, code)
+	if err != nil {
+		return fmt.Errorf("exchange code: %w", err)
+	}
+	return saveToken(tokenFile, tok)
+}
+
+// HasToken reports whether a valid-looking token file exists.
+func HasToken(tokenFile string) bool {
+	_, err := loadToken(tokenFile)
+	return err == nil
+}
+
+// NewFromOAuthConfig creates a Client using an already-loaded OAuth config and existing token.
+func NewFromOAuthConfig(ctx context.Context, oauthCfg *OAuthConfig, folderID, tokenFile string) (*Client, error) {
+	tok, err := loadToken(tokenFile)
+	if err != nil {
+		return nil, fmt.Errorf("load token: %w", err)
+	}
+	srv, err := drive.NewService(ctx, option.WithHTTPClient(oauthCfg.cfg.Client(ctx, tok)))
+	if err != nil {
+		return nil, fmt.Errorf("create drive service: %w", err)
+	}
+	return &Client{srv: srv, folderID: folderID}, nil
+}
+
 func loadToken(path string) (*oauth2.Token, error) {
 	f, err := os.Open(path)
 	if err != nil {
